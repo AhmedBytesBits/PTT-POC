@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="api_key">2cec1bac817c3739265940add7e46b27</string>
+    <string name="api_secret">ff32e8ffed89f06aab6f65b98c065661</string>
+    <string name="voicelayer_app_name">TamamCars</string>
+    <string name="android_key">0f571aedf32e0090f59fa9cdfda315f9</string>
+    <string name="android_secret">515f0242d2f4883be2eb2644e1534ffe</string>
+</resources>

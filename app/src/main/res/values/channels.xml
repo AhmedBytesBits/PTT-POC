@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="channels_labels">
+        <item>Makkah Center</item>
+        <item>Jeddah Center</item>
+        <item>Riyadh Center</item>
+    </string-array>
+    <string-array name="channels_values">
+        <item>makkah</item>
+        <item>jeddah</item>
+        <item>riyadh</item>
+    </string-array>
+</resources>
