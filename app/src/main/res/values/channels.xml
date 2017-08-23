@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="channels_labels">
+        <item>Select Channel</item>
         <item>Makkah Center</item>
         <item>Jeddah Center</item>
         <item>Riyadh Center</item>
     </string-array>
     <string-array name="channels_values">
+        <item></item>
         <item>makkah</item>
         <item>jeddah</item>
         <item>riyadh</item>
