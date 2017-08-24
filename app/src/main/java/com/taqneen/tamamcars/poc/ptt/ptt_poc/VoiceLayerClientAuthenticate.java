@@ -140,7 +140,7 @@ class VoiceLayerClientAuthenticate {
                 .setIssuedAt(new java.util.Date())
                 .setIssuer(apikey)
                 .setId(nonce)
-                .setSubject("ahmedrshdy")
+                .setSubject(username)
                 .signWith(SignatureAlgorithm.HS256, key)
                 .compact();
         try {

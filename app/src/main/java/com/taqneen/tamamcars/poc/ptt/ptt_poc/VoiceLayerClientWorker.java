@@ -2,18 +2,19 @@ package com.taqneen.tamamcars.poc.ptt.ptt_poc;
 
 import android.app.Activity;
 import android.content.Context;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 
 import java.net.MalformedURLException;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 
 import io.voicelayer.voicelayerSdk.PaginatedResponse;
 import io.voicelayer.voicelayerSdk.VoiceLayerChannel;
 import io.voicelayer.voicelayerSdk.VoiceLayerClient;
 import io.voicelayer.voicelayerSdk.VoiceLayerConfiguration;
 import io.voicelayer.voicelayerSdk.VoiceLayerMessage;
+import io.voicelayer.voicelayerSdk.VoiceLayerMessagePlayer;
 import io.voicelayer.voicelayerSdk.VoiceLayerMessageRecorder;
 import io.voicelayer.voicelayerSdk.VoiceLayerRecorderEvent;
 import io.voicelayer.voicelayerSdk.VoiceLayerUser;
@@ -24,8 +25,8 @@ import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerCreateCallback;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerFetchCallback;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerJoinChannelCallback;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerLoginCallback;
+import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerMessageEventListener;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerRecorderEventListener;
-import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerRemoveCallback;
 
 import static io.jsonwebtoken.lang.Collections.size;
 
@@ -35,10 +36,10 @@ import static io.jsonwebtoken.lang.Collections.size;
 
 public class VoiceLayerClientWorker{
     private String channel;
-    private String username;
 
-    private VoiceLayerUser CURRENT_USER;
-    private VoiceLayerChannel CURRENT_CHANNEL;
+    private VoiceLayerUser currentUser;
+    private VoiceLayerChannel currentChannel;
+    private OnListenToChannel listenCompleted;
     private VoiceLayerClient vlc;
 
 
@@ -71,20 +72,85 @@ public class VoiceLayerClientWorker{
             vlc.login(token, new VoiceLayerLoginCallback() {
                 @Override
                 public void onLoginComplete(VoiceLayerUser voiceLayerUser, String s, VoiceLayerException e) {
-                    CURRENT_USER = voiceLayerUser;
+                    currentUser = voiceLayerUser;
+                    Log.d("vlc", "user id: " + currentUser.id);
                 }
             });
         } catch (Exception e){
             Log.e("vlc", "log in failed");
             e.printStackTrace();
         }
+
+        final VoiceLayerMessageRecorder recorder = vlc.getMessageRecorder();
+
+        recorder.setRecorderEventListener(new VoiceLayerRecorderEventListener() {
+
+            @Override
+            public void onRecorderEvent(VoiceLayerRecorderEvent event, VoiceLayerMessage message) {
+                // Called when recording starts and finishes.
+                if(event.equals(VoiceLayerRecorderEvent.FINISH)){
+                    Log.d("vlc", "recording ended");
+                }
+
+                if (event.equals(VoiceLayerRecorderEvent.START)){
+                    Log.d("vlc", "recording started");
+
+                }
+
+            }
+
+            @Override
+            public void onRecordingFailed(VoiceLayerRecorderException e, VoiceLayerMessage voiceLayerMessage) {
+                Log.d("vlc", "recording failed");
+
+            }
+
+            @Override
+            public void onUploadFailed(VoiceLayerRecorderException e, VoiceLayerMessage voiceLayerMessage) {
+                Log.d("vlc", "uploading failed");
+
+            }
+        });
+
+        vlc.setMessageEventListener(new VoiceLayerMessageEventListener() {
+            @Override
+            public void onMessagePosted(VoiceLayerMessage voiceLayerMessage) {
+                Log.d("vlc", "new message received");
+                if(!voiceLayerMessage.user.id.equals(currentUser.id)) {
+                    VoiceLayerMessagePlayer player = vlc.getMessagePlayer();
+                    player.playMessage(voiceLayerMessage);
+                    ((MainActivity) context).playOut();
+                }
+            }
+
+            @Override
+            public void onMessageUpdated(VoiceLayerMessage voiceLayerMessage) {
+
+            }
+
+            @Override
+            public void onMessageRemoved(String s, VoiceLayerChannel voiceLayerChannel) {
+
+            }
+
+            @Override
+            public void onMessageReuploaded(VoiceLayerMessage voiceLayerMessage) {
+
+            }
+
+            @Override
+            public void onMissedMessagesRetrieved(Map<VoiceLayerChannel, List<VoiceLayerMessage>> map) {
+
+            }
+        });
     }
 
     void setChannel(String name){
         channel = name;
     }
 
-    void listenToChannel(){
+    void listenToChannel(OnListenToChannel callback){
+        listenCompleted = callback;
         vlc.getPublicChannels(1, 5, new VoiceLayerFetchCallback<PaginatedResponse<List<VoiceLayerChannel>>>() {
                 @Override
                 public void onFetchComplete(PaginatedResponse<List<VoiceLayerChannel>> listPaginatedResponse, VoiceLayerException e1) {
@@ -95,7 +161,7 @@ public class VoiceLayerClientWorker{
                     for(int i=0; i<size(listPaginatedResponse.getResult()); i++){
                         if(listPaginatedResponse.getResult().get(i).name.equals( channel)){
                             Log.d("vlc", "channel is already present");
-                            CURRENT_CHANNEL = listPaginatedResponse.getResult().get(i);
+                            currentChannel = listPaginatedResponse.getResult().get(i);
                             joinChannel();
                         }
                     }
@@ -112,16 +178,16 @@ public class VoiceLayerClientWorker{
         vlc.createChannel(channel, traits, new VoiceLayerCreateCallback<VoiceLayerChannel>() {
             @Override
             public void onCreateComplete(VoiceLayerChannel channel, VoiceLayerException exception) {
-                CURRENT_CHANNEL = channel;
+                currentChannel = channel;
                 Log.d("vlc", "channel created with name:" + channel.name);
-                listenToChannel();
+                listenToChannel(listenCompleted);
             }
         });
 
     }
 
     private void joinChannel(){
-        CURRENT_CHANNEL.join(new VoiceLayerJoinChannelCallback() {
+        currentChannel.join(new VoiceLayerJoinChannelCallback() {
 
             @Override
             public void onJoinChannelComplete(VoiceLayerException e) {
@@ -135,10 +201,11 @@ public class VoiceLayerClientWorker{
     }
 
     private void subChannel(){
-        CURRENT_CHANNEL.subscribe(new VoiceLayerChannelSubscriptionCallback() {
+        currentChannel.subscribe(new VoiceLayerChannelSubscriptionCallback() {
             @Override
             public void onSubscribedToChannelEvents(VoiceLayerChannel voiceLayerChannel, VoiceLayerException e) {
                 Log.d("vlc", "subscribed into channel: " + channel);
+                listenCompleted.onSuccessLiesten(context);
 
             }
 
@@ -151,31 +218,10 @@ public class VoiceLayerClientWorker{
 
     void startRecording() {
         final VoiceLayerMessageRecorder recorder = vlc.getMessageRecorder();
-
-        recorder.setRecorderEventListener(new VoiceLayerRecorderEventListener() {
-
-            @Override
-            public void onRecorderEvent(VoiceLayerRecorderEvent event, VoiceLayerMessage message) {
-                // Called when recording starts and finishes.
-                Log.d("vlc", "recording success");
-            }
-
-            @Override
-            public void onRecordingFailed(VoiceLayerRecorderException e, VoiceLayerMessage voiceLayerMessage) {
-                Log.d("vlc", "recording failed");
-
-            }
-
-            @Override
-            public void onUploadFailed(VoiceLayerRecorderException e, VoiceLayerMessage voiceLayerMessage) {
-                Log.d("vlc", "uploading failed");
-
-            }
-        });
-        VoiceLayerMessage vmsg = recorder.startRecording(CURRENT_CHANNEL);
+        VoiceLayerMessage vmsg = recorder.startRecording(currentChannel);
 
         boolean s = recorder.isRecording();
-        Log.d("vlc", "is recording: " + s);
+        Log.d("vlc", " isRcording: " + s);
 
     }
 
@@ -183,8 +229,13 @@ public class VoiceLayerClientWorker{
         float msg_length;
         final VoiceLayerMessageRecorder recorder = vlc.getMessageRecorder();
         msg_length = recorder.stopRecording();
-    //        recorder.setRecorderEventListener(null);
-            return msg_length;
-        }
+//        recorder.setRecorderEventListener(null);
+        Log.d("vlc", "recorded length: " + msg_length);
+        return msg_length;
+    }
 
+}
+
+interface OnListenToChannel{
+    public void onSuccessLiesten(Context context);
 }

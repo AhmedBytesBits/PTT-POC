@@ -1,8 +1,12 @@
 package com.taqneen.tamamcars.poc.ptt.ptt_poc;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.media.MediaPlayer;
@@ -24,6 +28,8 @@ public class MainActivity extends AppCompatActivity {
     private static VoiceLayerClientWorker vlc_worker;
     private static String currentchannel;
     private static String userid = null;
+    private static MediaPlayer sout;
+
 
     //    private static final String TAG = MainActivity.class.getSimpleName();
 //    private Button ptt;
@@ -36,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
         final VoiceLayerClientAuthenticate vlc_auth = new VoiceLayerClientAuthenticate(this);
         final MediaPlayer apush = MediaPlayer.create(this, R.raw.ptt_push);
         final MediaPlayer rpush = MediaPlayer.create(this, R.raw.ptt_release);
+        sout = MediaPlayer.create(this, R.raw.ptt_out);
 
         Button ptt = (Button)findViewById(R.id.PTT_Button);
         Button connect = (Button)findViewById(R.id.Connect_Button);
@@ -86,18 +93,26 @@ public class MainActivity extends AppCompatActivity {
 
 
         ptt.setOnTouchListener(new View.OnTouchListener() {
+            static final int REQUEST_MICROPHONE = 1 ;
+
             @Override
             public boolean onTouch(View v, MotionEvent event) {
 
                 if(event.getAction()  == MotionEvent.ACTION_DOWN){
+                    if (ContextCompat.checkSelfPermission(MainActivity.this,
+                            Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+
+                        ActivityCompat.requestPermissions(MainActivity.this,
+                                new String[]{Manifest.permission.RECORD_AUDIO},
+                                REQUEST_MICROPHONE);
+
+                    }
                     apush.start();
                     vlc_worker.startRecording();
-                    Log.d("vlc", "message recording started");
 
                 } else if (event.getAction() == MotionEvent.ACTION_UP){
                     rpush.start();
                     float r = vlc_worker.endRecording();
-                    Log.d("vlc", "message recording ended");
 
                 }
 
@@ -106,11 +121,12 @@ public class MainActivity extends AppCompatActivity {
         });
         }
 
+
     public void initilaizeVLC(Context context, String token){
 //        TODO: send listenTochennel() to callback
         vlc_worker = new VoiceLayerClientWorker(context, token);
         vlc_worker.setChannel(currentchannel);
-        vlc_worker.listenToChannel();
+        vlc_worker.listenToChannel(new ListenCompleted());
     }
 
     public void setCurrentChannel(String v){
@@ -124,23 +140,18 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public void playOut(){
+        sout.start();
+    }
+
 }
 
-class AuthCompleted extends Activity implements OnAuthCompleteListener{
+class AuthCompleted implements OnAuthCompleteListener{
     private MainActivity activity = new MainActivity();
 
     @Override
     public void doSomeThing(final Context context, final String token) {
-        final Button ptt_btn = (Button)((Activity) context).findViewById(R.id.PTT_Button);
-        ((Activity) context).runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                activity.initilaizeVLC(context, token);
-//      TODO: enable ptt_btn only after channel is subscribed
-                ptt_btn.setEnabled(true);
-
-            }
-        });
+        activity.initilaizeVLC(context, token);
         Log.d("VLC", "Used token: "+ token);
     }
 }
@@ -162,5 +173,20 @@ class ChannelsListActivity implements AdapterView.OnItemSelectedListener {
 
     public void onNothingSelected(AdapterView<?> parent) {
         // Another interface callback
+    }
+}
+
+class ListenCompleted implements OnListenToChannel{
+
+    @Override
+    public void onSuccessLiesten(Context context) {
+        final Button ptt_btn = (Button)((Activity) context).findViewById(R.id.PTT_Button);
+        ((Activity) context).runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ptt_btn.setEnabled(true);
+
+            }
+        });
     }
 }
