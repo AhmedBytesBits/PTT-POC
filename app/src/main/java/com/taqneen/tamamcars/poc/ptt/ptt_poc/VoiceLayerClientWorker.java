@@ -6,11 +6,15 @@ import android.util.Log;
 
 import java.net.MalformedURLException;
 import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 import io.voicelayer.voicelayerSdk.PaginatedResponse;
 import io.voicelayer.voicelayerSdk.VoiceLayerChannel;
+import io.voicelayer.voicelayerSdk.VoiceLayerChannelInvitation;
 import io.voicelayer.voicelayerSdk.VoiceLayerClient;
 import io.voicelayer.voicelayerSdk.VoiceLayerConfiguration;
 import io.voicelayer.voicelayerSdk.VoiceLayerMessage;
@@ -20,10 +24,10 @@ import io.voicelayer.voicelayerSdk.VoiceLayerRecorderEvent;
 import io.voicelayer.voicelayerSdk.VoiceLayerUser;
 import io.voicelayer.voicelayerSdk.exceptions.VoiceLayerException;
 import io.voicelayer.voicelayerSdk.exceptions.VoiceLayerRecorderException;
+import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerChannelRequestCallback;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerChannelSubscriptionCallback;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerCreateCallback;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerFetchCallback;
-import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerJoinChannelCallback;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerLoginCallback;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerMessageEventListener;
 import io.voicelayer.voicelayerSdk.interfaces.VoiceLayerRecorderEventListener;
@@ -41,6 +45,9 @@ public class VoiceLayerClientWorker{
     private VoiceLayerChannel currentChannel;
     private OnListenToChannel listenCompleted;
     private VoiceLayerClient vlc;
+    Queue<VoiceLayerMessage> messages=new LinkedList<VoiceLayerMessage>();
+    VoiceLayerMessagePlayer player;
+
 
 
     private Context context;
@@ -111,15 +118,15 @@ public class VoiceLayerClientWorker{
 
             }
         });
+//        Handle newly received messages
 
         vlc.setMessageEventListener(new VoiceLayerMessageEventListener() {
             @Override
             public void onMessagePosted(VoiceLayerMessage voiceLayerMessage) {
                 Log.d("vlc", "new message received");
                 if(!voiceLayerMessage.user.id.equals(currentUser.id)) {
-                    VoiceLayerMessagePlayer player = vlc.getMessagePlayer();
-                    player.playMessage(voiceLayerMessage);
-                    ((MainActivity) context).playOut();
+                    messages.add(voiceLayerMessage);
+                    playMessages();
                 }
             }
 
@@ -187,13 +194,12 @@ public class VoiceLayerClientWorker{
     }
 
     private void joinChannel(){
-        currentChannel.join(new VoiceLayerJoinChannelCallback() {
+        currentChannel.requestToJoin(new VoiceLayerChannelRequestCallback() {
 
             @Override
-            public void onJoinChannelComplete(VoiceLayerException e) {
+            public void onChannelRequestCompleted(VoiceLayerChannelInvitation voiceLayerChannelInvitation, VoiceLayerException e) {
                 Log.d("vlc", "channel joined: " + channel);
                 subChannel();
-
             }
 
         });
@@ -206,7 +212,7 @@ public class VoiceLayerClientWorker{
             public void onSubscribedToChannelEvents(VoiceLayerChannel voiceLayerChannel, VoiceLayerException e) {
                 Log.d("vlc", "subscribed into channel: " + channel);
                 listenCompleted.onSuccessLiesten(context);
-
+                player = vlc.getMessagePlayer();
             }
 
             @Override
@@ -218,8 +224,9 @@ public class VoiceLayerClientWorker{
 
     void startRecording() {
         final VoiceLayerMessageRecorder recorder = vlc.getMessageRecorder();
-        VoiceLayerMessage vmsg = recorder.startRecording(currentChannel);
+        player.pause();
 
+        VoiceLayerMessage vmsg = recorder.startRecording(currentChannel);
         boolean s = recorder.isRecording();
         Log.d("vlc", " isRcording: " + s);
 
@@ -229,11 +236,21 @@ public class VoiceLayerClientWorker{
         float msg_length;
         final VoiceLayerMessageRecorder recorder = vlc.getMessageRecorder();
         msg_length = recorder.stopRecording();
-//        recorder.setRecorderEventListener(null);
+        player.resume();
         Log.d("vlc", "recorded length: " + msg_length);
         return msg_length;
     }
 
+    void playMessages(){
+
+        Iterator it=messages.iterator();
+
+        while(it.hasNext()){
+            VoiceLayerMessage message = (VoiceLayerMessage) it.next();
+            player.playMessage(message);
+            ((MainActivity)context).playOut();
+        }
+    }
 }
 
 interface OnListenToChannel{

@@ -4,7 +4,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.content.res.Resources;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -15,13 +14,14 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
-
-import java.util.List;
+import com.crashlytics.android.Crashlytics;
+import io.fabric.sdk.android.Fabric;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -37,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Fabric.with(this, new Crashlytics());
         setContentView(R.layout.activity_main);
 
         final VoiceLayerClientAuthenticate vlc_auth = new VoiceLayerClientAuthenticate(this);
@@ -56,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
         ptt.setEnabled(false);
         connect.setEnabled(false);
 
+
         username.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -71,12 +73,20 @@ public class MainActivity extends AppCompatActivity {
             public void afterTextChanged(Editable s) {
 
             }
+
         });
 
         connect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 try{
+                    Button connect = (Button)findViewById(R.id.Connect_Button);
+                    connect.setEnabled(false);
+                    View view = getCurrentFocus();
+                    if (view != null) {
+                        InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                        imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                    }
                     vlc_auth.auth(userid, new AuthCompleted());
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -181,9 +191,12 @@ class ListenCompleted implements OnListenToChannel{
     @Override
     public void onSuccessLiesten(Context context) {
         final Button ptt_btn = (Button)((Activity) context).findViewById(R.id.PTT_Button);
+        final Button connect = (Button)((Activity) context).findViewById(R.id.Connect_Button);
+
         ((Activity) context).runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                connect.setEnabled(true);
                 ptt_btn.setEnabled(true);
 
             }
